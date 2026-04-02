@@ -1,0 +1,46 @@
+services:
+  qdrant:
+    build:
+      context: ./docker_vdb
+      dockerfile: dockerfile_vdb          
+    container_name: qdrant
+    ports:
+      - "6333:6333"   # HTTP
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    env_file:
+      - ./docker_vdb/.env_vdb     
+    environment:
+      - QDRANT__SERVICE__API_KEY=${API_QDRANT_LOCAL_KEY}
+    restart: unless-stopped
+
+  llama-server:
+    build:
+      context: ./docker_model
+      dockerfile: dockerfile_model
+    container_name: llama-server
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./models:/models:ro
+    env_file:
+      - ./docker_model/.env_model      # подключаем env специально для модели
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      -m ${MODEL_PATH}
+      --host ${HOST}
+      --port ${PORT}
+      --n-gpu-layers ${GPU_LAYERS}
+      --cont-batching
+      --ctx-size ${CTX_SIZE}
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
